@@ -1,7 +1,18 @@
-name: Create New Kaggle Notebook
+name: Kaggle Automation
 
 on:
   workflow_dispatch:
+    inputs:
+      script:
+        description: 'Which script to run'
+        required: true
+        default: 'voiceover'
+        type: choice
+        options:
+          - voiceover
+          - video
+          - image
+          - data
 
 jobs:
   deploy-to-kaggle:
@@ -28,11 +39,11 @@ jobs:
         mkdir -p ~/.kaggle
         echo "{\"username\":\"$KAGGLE_USERNAME\",\"key\":\"$KAGGLE_KEY\"}" > ~/.kaggle/kaggle.json
         chmod 600 ~/.kaggle/kaggle.json
-        echo "✅ Kaggle credentials configured"
     
-    - name: Create and push new Kaggle notebook
+    - name: Run selected script
       env:
         KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
         KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
       run: |
-        python create_notebook.py
+        echo "Running ${{ inputs.script }}.py automation..."
+        python ${{ inputs.script }}.py
