@@ -1,6 +1,12 @@
 import json
 import os
 from datetime import datetime
+
+# Set Kaggle credentials from environment variables BEFORE importing
+os.environ['KAGGLE_USERNAME'] = os.environ.get('KAGGLE_USERNAME', '')
+os.environ['KAGGLE_KEY'] = os.environ.get('KAGGLE_KEY', '')
+
+# NOW import Kaggle API (after credentials are set)
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 def create_notebook():
@@ -27,7 +33,7 @@ def create_notebook():
         "kernel_sources": []
     }
     
-    # Read the complete code from your document
+    # Complete Gemini TTS code
     complete_code = """# Install required libraries
 !pip install -q gradio google-generativeai
 
@@ -64,7 +70,7 @@ API_KEYS = [
     'AIzaSyBN0V0v5IetKuEFaKTB9vfyBE0oVzZDVWg'
 ]
 
-# Gemini TTS Voice Models (30 available voices)
+# Gemini TTS Voice Models
 VOICE_OPTIONS = {
     "🎭 Zephyr (Bright)": "Zephyr",
     "🎪 Puck (Upbeat)": "Puck",
@@ -98,7 +104,6 @@ VOICE_OPTIONS = {
     "🎺 Sulafat (Melodic)": "Sulafat"
 }
 
-# Model options
 MODEL_OPTIONS = {
     "Gemini 2.5 Flash (Fast & Efficient)": "gemini-2.5-flash-preview-tts",
     "Gemini 2.5 Pro (High Quality)": "gemini-2.5-pro-preview-tts"
@@ -114,20 +119,12 @@ def save_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
 def generate_gemini_voiceover(text, voice_name, model_name, style_prompt=""):
     try:
         if not text or text.strip() == "":
-            return None, "⚠️ Please enter some text to generate voiceover!"
+            return None, "⚠️ Please enter some text!"
         
         api_key = random.choice(API_KEYS)
-        print(f"🔑 Using API Key: {api_key[:20]}...")
-        
         client = genai.Client(api_key=api_key)
         
-        if style_prompt and style_prompt.strip():
-            full_prompt = f"{style_prompt}: {text}"
-        else:
-            full_prompt = f"Say: {text}"
-        
-        print(f"🎤 Generating with voice: {voice_name}")
-        print(f"📱 Using model: {model_name}")
+        full_prompt = f"{style_prompt}: {text}" if style_prompt else f"Say: {text}"
         
         response = client.models.generate_content(
             model=model_name,
@@ -149,94 +146,51 @@ def generate_gemini_voiceover(text, voice_name, model_name, style_prompt=""):
         output_file = f"gemini_voiceover_{timestamp}.wav"
         save_wave_file(output_file, audio_data)
         
-        word_count = len(text.split())
-        char_count = len(text)
-        status_msg = (
-            f"✅ Hyper-Realistic Voiceover Generated!\\n"
-            f"🎙️ Voice: {voice_name}\\n"
-            f"🤖 Model: {model_name.split('-')[2].upper()}\\n"
-            f"📝 Words: {word_count} | Characters: {char_count}\\n"
-            f"🔑 API: {api_key[:25]}..."
-        )
-        
-        return output_file, status_msg
-        
+        return output_file, f"✅ Generated! Words: {len(text.split())}"
     except Exception as e:
-        error_msg = f"❌ Error: {str(e)}\\n\\n💡 Tip: If you see rate limit errors, try again in a few seconds."
-        return None, error_msg
+        return None, f"❌ Error: {str(e)}"
 
-# Create Gradio Interface
-with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Voice Generator") as demo:
-    gr.Markdown(
-        \"\"\"
-        # 🎙️ Gemini Native TTS - Hyper-Realistic Voice Generator
-        ### Generate professional studio-quality voiceovers with Google's Gemini 2.5 AI
-        **Features:** 30+ Ultra-Realistic Voices | Multi-Language | Style Control | Random API Key Rotation
-        \"\"\"
-    )
+with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS") as demo:
+    gr.Markdown("# 🎙️ Gemini TTS Voice Generator")
     
     with gr.Row():
         with gr.Column(scale=2):
-            text_input = gr.Textbox(
-                label="📝 Enter Your Text",
-                placeholder="Paste your complete script here...",
-                lines=12,
-                max_lines=25
-            )
-            
-            style_input = gr.Textbox(
-                label="🎨 Style Instructions (Optional)",
-                placeholder="Example: Say cheerfully | Speak in a calm professional tone",
-                lines=2
-            )
+            text_input = gr.Textbox(label="📝 Text", lines=10)
+            style_input = gr.Textbox(label="🎨 Style", lines=2)
             
             with gr.Row():
                 model_dropdown = gr.Dropdown(
                     choices=list(MODEL_OPTIONS.keys()),
                     value="Gemini 2.5 Flash (Fast & Efficient)",
-                    label="🤖 Select Model"
+                    label="Model"
                 )
-                
                 voice_dropdown = gr.Dropdown(
                     choices=list(VOICE_OPTIONS.keys()),
                     value="🎙️ Kore (Professional)",
-                    label="🎤 Select Voice"
+                    label="Voice"
                 )
             
-            generate_btn = gr.Button(
-                "🎵 Generate Hyper-Realistic Voiceover", 
-                variant="primary", 
-                size="lg"
-            )
+            generate_btn = gr.Button("🎵 Generate", variant="primary")
         
         with gr.Column(scale=1):
-            audio_output = gr.Audio(
-                label="🔊 Generated Voiceover",
-                type="filepath",
-                interactive=False
-            )
-            status_output = gr.Textbox(
-                label="📊 Generation Status",
-                lines=8,
-                interactive=False
-            )
+            audio_output = gr.Audio(label="Output")
+            status_output = gr.Textbox(label="Status", lines=5)
     
-    def process_voiceover(text, voice_display, model_display, style):
+    def process(text, voice_display, model_display, style):
         voice_name = VOICE_OPTIONS[voice_display]
         model_name = MODEL_OPTIONS[model_display]
         return generate_gemini_voiceover(text, voice_name, model_name, style)
     
     generate_btn.click(
-        fn=process_voiceover,
+        fn=process,
         inputs=[text_input, voice_dropdown, model_dropdown, style_input],
         outputs=[audio_output, status_output]
     )
 
-print("🚀 Launching Gemini Native TTS Interface...")
 demo.launch(share=True, debug=True)
 """
     
-    # Create notebook with single code cell
+    # Create notebook
     notebook = {
         "cells": [
             {
@@ -270,10 +224,9 @@ demo.launch(share=True, debug=True)
         json.dump(metadata, f, indent=2)
     
     # Push to Kaggle
-    print(f"📤 Pushing new notebook to Kaggle: {metadata['title']}")
+    print(f"📤 Pushing new notebook: {metadata['title']}")
     api.kernels_push('.')
-    print(f"✅ Notebook created successfully!")
-    print(f"🔗 View at: https://www.kaggle.com/code/{metadata['id']}")
+    print(f"✅ Success! View at: https://www.kaggle.com/code/{metadata['id']}")
 
 if __name__ == "__main__":
     create_notebook()
