@@ -20,6 +20,23 @@ jobs:
       run: |
         pip install kaggle
     
+    - name: Verify secrets are available
+      env:
+        KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+      run: |
+        echo "Checking if secrets are set..."
+        if [ -z "$KAGGLE_USERNAME" ]; then
+          echo "ERROR: KAGGLE_USERNAME is empty!"
+          exit 1
+        fi
+        if [ -z "$KAGGLE_KEY" ]; then
+          echo "ERROR: KAGGLE_KEY is empty!"
+          exit 1
+        fi
+        echo "✅ Secrets are properly set"
+        echo "Username: $KAGGLE_USERNAME"
+    
     - name: Configure Kaggle credentials
       env:
         KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
@@ -28,6 +45,8 @@ jobs:
         mkdir -p ~/.kaggle
         echo "{\"username\":\"$KAGGLE_USERNAME\",\"key\":\"$KAGGLE_KEY\"}" > ~/.kaggle/kaggle.json
         chmod 600 ~/.kaggle/kaggle.json
+        echo "✅ Kaggle credentials configured"
+        cat ~/.kaggle/kaggle.json
     
     - name: Create and push new Kaggle notebook
       run: |
