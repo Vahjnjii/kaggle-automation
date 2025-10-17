@@ -32,530 +32,528 @@ def create_notebook():
         "kernel_sources": []
     }
     
-    # UPDATED COMPLETE CODE - Using list to avoid quote issues
-    complete_code_lines = [
-        "# Install required libraries",
-        "!pip install -q gradio google-generativeai pydub",
-        "",
-        "import gradio as gr",
-        "import random",
-        "import wave",
-        "import os",
-        "import re",
-        "import time",
-        "from datetime import datetime",
-        "from google import genai",
-        "from google.genai import types",
-        "from pydub import AudioSegment",
-        "from concurrent.futures import ThreadPoolExecutor, as_completed",
-        "import threading",
-        "",
-        "# API Keys",
-        "API_KEYS = [",
-        "    'AIzaSyBWYWNkIt8Q7nl7I-JDj9ozaVwOAFf7WsA',",
-        "    'AIzaSyB4Y_Z8bc82VN15pGes-a049ZNcjTsJTFs',",
-        "    'AIzaSyD3vGJyJtdSKuaxbb4AZVosyJ76ult21d8',",
-        "    'AIzaSyAbmN08A4l61-q1mYjK3DQe29BKcSYmov8',",
-        "    'AIzaSyAD8-aEvVIvkBwQFUMugb9XgVDBUQR-zfk',",
-        "    'AIzaSyD-nf3OHLbI5R23f7VLVLO1FHTWM6OWwCs',",
-        "    'AIzaSyBjYlIv84CNzpudzYyl6ANCz-2xRtSw5Dc',",
-        "    'AIzaSyCLjFGChLdvNSBoCVKbTAtR4zNTegeI19U',",
-        "    'AIzaSyD5IB7uqfyAp9XbN7GrZb_ykofO44AFIWw',",
-        "    'AIzaSyAuLu3EU3o_bp4GsHKKQuvE-u02EXEi308',",
-        "    'AIzaSyDcwUdktdj5J1JsVn8pLY4aog2S-2hE1j4',",
-        "    'AIzaSyCNJdzUaErIF4CkHhd_W3cNAhU7qqWgWLI',",
-        "    'AIzaSyA94-jrtNUK1Rs9DWxE4YH7cAvpo4oGu5k',",
-        "    'AIzaSyBiR58evdCtCGAtZiOvIiwAKtc6P-K6d0o',",
-        "    'AIzaSyAC3au8LAdnk_-yrzKTZ9EfDUUypJc2K_0',",
-        "    'AIzaSyANdNVOWRlRKubxa7w0lX21MFztQtHirbM',",
-        "    'AIzaSyCqf1kobLM4Xo1WDkl49UJpXvJp3g1g6RE',",
-        "    'AIzaSyAclybUHEwGic8nIRsIgV976UQNmxCAqSQ',",
-        "    'AIzaSyCASH5DEm2l8JwfFWJw8gMtYgR8fjip2sA',",
-        "    'AIzaSyBN0V0v5IetKuEFaKTB9vfyBE0oVzZDVWg'",
-        "]",
-        "",
-        "# Voice and Model Options",
-        "VOICES = {",
-        '    "Zephyr": "Zephyr", "Puck": "Puck", "Charon": "Charon", "Kore": "Kore",',
-        '    "Fenrir": "Fenrir", "Leda": "Leda", "Orus": "Orus", "Aoede": "Aoede",',
-        '    "Callirhoe": "Callirhoe", "Autonoe": "Autonoe", "Enceladus": "Enceladus",',
-        '    "Iapetus": "Iapetus", "Umbriel": "Umbriel", "Algieba": "Algieba",',
-        '    "Despina": "Despina", "Erinome": "Erinome", "Algenib": "Algenib",',
-        '    "Rasalgethi": "Rasalgethi", "Laomedeia": "Laomedeia", "Achernar": "Achernar",',
-        '    "Alnilam": "Alnilam", "Schedar": "Schedar", "Gacrux": "Gacrux",',
-        '    "Pulcherrima": "Pulcherrima", "Achird": "Achird", "Zubenelgenubi": "Zubenelgenubi",',
-        '    "Vindemiatrix": "Vindemiatrix", "Sadachbia": "Sadachbia", "Sadaltager": "Sadaltager",',
-        '    "Sulafat": "Sulafat"',
-        "}",
-        "",
-        "MODELS = {",
-        '    "Flash": "gemini-2.5-flash-preview-tts",',
-        '    "Pro": "gemini-2.5-pro-preview-tts"',
-        "}",
-        "",
-        "# API Key Manager",
-        "class APIKeyManager:",
-        '    """Manages API key rotation with intelligent failure handling"""',
-        "    ",
-        "    def __init__(self, keys):",
-        "        self.all_keys = keys.copy()",
-        "        self.current_pool = []",
-        "        self.index = 0",
-        "        self.consecutive_failures = 0",
-        "        self.lock = threading.Lock()",
-        "        self.failed_keys = set()",
-        "    ",
-        "    def initialize(self):",
-        '        """Initialize with randomized key pool"""',
-        "        with self.lock:",
-        "            self.current_pool = self.all_keys.copy()",
-        "            random.shuffle(self.current_pool)",
-        "            self.index = 0",
-        "            self.consecutive_failures = 0",
-        "            self.failed_keys.clear()",
-        '            print(f"🔑 Initialized with {len(self.current_pool)} API keys")',
-        "    ",
-        "    def get_next_key(self):",
-        '        """Get next API key in sequential order"""',
-        "        with self.lock:",
-        "            if not self.current_pool:",
-        "                return None",
-        "            ",
-        "            key = self.current_pool[self.index % len(self.current_pool)]",
-        "            self.index += 1",
-        "            return key",
-        "    ",
-        "    def mark_failure(self, key):",
-        '        """Mark key as failed and handle re-randomization"""',
-        "        with self.lock:",
-        "            self.failed_keys.add(key)",
-        "            self.consecutive_failures += 1",
-        "            ",
-        "            if self.consecutive_failures >= 3:",
-        '                print("⚠️ 3 consecutive failures - Re-randomizing API pool...")',
-        "                random.shuffle(self.current_pool)",
-        "                self.index = 0",
-        "                self.consecutive_failures = 0",
-        "    ",
-        "    def mark_success(self):",
-        '        """Reset failure counter on success"""',
-        "        with self.lock:",
-        "            self.consecutive_failures = 0",
-        "    ",
-        "    def get_stats(self):",
-        '        """Get current statistics"""',
-        "        with self.lock:",
-        "            return {",
-        "                'total_keys': len(self.all_keys),",
-        "                'failed_keys': len(self.failed_keys),",
-        "                'consecutive_failures': self.consecutive_failures",
-        "            }",
-        "",
-        "# Global key manager",
-        "key_manager = APIKeyManager(API_KEYS)",
-        "",
-        "def split_text_at_sentences(text, max_chars=5000):",
-        '    """',
-        "    Split text into chunks at sentence boundaries",
-        "    ",
-        "    Args:",
-        "        text: Input text to split",
-        "        max_chars: Maximum characters per chunk",
-        "    ",
-        "    Returns:",
-        "        List of text chunks",
-        '    """',
-        "    try:",
-        "        # Split by sentence endings",
-        "        sentences = re.split(r'(?<=[.!?])\\s+', text.strip())",
-        "        ",
-        "        chunks = []",
-        '        current_chunk = ""',
-        "        ",
-        "        for sentence in sentences:",
-        "            sentence = sentence.strip()",
-        "            if not sentence:",
-        "                continue",
-        "            ",
-        "            # Check if adding sentence exceeds limit",
-        '            test_chunk = f"{current_chunk} {sentence}".strip() if current_chunk else sentence',
-        "            ",
-        "            if len(test_chunk) <= max_chars:",
-        "                current_chunk = test_chunk",
-        "            else:",
-        "                # Save current chunk if it exists",
-        "                if current_chunk:",
-        "                    chunks.append(current_chunk)",
-        "                ",
-        "                # Start new chunk with current sentence",
-        "                current_chunk = sentence",
-        "        ",
-        "        # Add final chunk",
-        "        if current_chunk:",
-        "            chunks.append(current_chunk)",
-        "        ",
-        "        return chunks if chunks else [text]",
-        "    ",
-        "    except Exception as e:",
-        '        print(f"❌ Error splitting text: {e}")',
-        "        return [text]",
-        "",
-        "def save_audio_file(filename, audio_bytes):",
-        '    """',
-        "    Save audio bytes to WAV file",
-        "    ",
-        "    Args:",
-        "        filename: Output filename",
-        "        audio_bytes: PCM audio data",
-        "    ",
-        "    Returns:",
-        "        True if successful, False otherwise",
-        '    """',
-        "    try:",
-        '        with wave.open(filename, "wb") as wf:',
-        "            wf.setnchannels(1)",
-        "            wf.setsampwidth(2)",
-        "            wf.setframerate(24000)",
-        "            wf.writeframes(audio_bytes)",
-        "        return True",
-        "    except Exception as e:",
-        '        print(f"❌ Error saving audio file {filename}: {e}")',
-        "        return False",
-        "",
-        "def generate_audio_chunk(chunk_text, voice, model, chunk_id, max_attempts=10):",
-        '    """',
-        "    Generate audio for a single chunk with retry logic",
-        "    ",
-        "    Args:",
-        "        chunk_text: Text to convert to speech",
-        "        voice: Voice name",
-        "        model: Model name",
-        "        chunk_id: Chunk identifier",
-        "        max_attempts: Maximum retry attempts",
-        "    ",
-        "    Returns:",
-        "        Dict with audio_data, api_key, attempts, and success status",
-        '    """',
-        "    for attempt in range(max_attempts):",
-        "        api_key = key_manager.get_next_key()",
-        "        ",
-        "        if not api_key:",
-        '            print(f"❌ Chunk {chunk_id}: No API keys available")',
-        "            return {",
-        "                'chunk_id': chunk_id,",
-        "                'audio_data': None,",
-        "                'api_key': None,",
-        "                'attempts': attempt + 1,",
-        "                'success': False,",
-        "                'error': 'No API keys available'",
-        "            }",
-        "        ",
-        "        # Skip known failed keys",
-        "        if api_key in key_manager.failed_keys:",
-        "            continue",
-        "        ",
-        "        try:",
-        '            print(f"🔄 Chunk {chunk_id}: Attempt {attempt + 1} with key {api_key[:20]}...")',
-        "            ",
-        "            client = genai.Client(api_key=api_key)",
-        "            ",
-        "            response = client.models.generate_content(",
-        "                model=model,",
-        '                contents=f"Say: {chunk_text}",',
-        "                config=types.GenerateContentConfig(",
-        '                    response_modalities=["AUDIO"],',
-        "                    speech_config=types.SpeechConfig(",
-        "                        voice_config=types.VoiceConfig(",
-        "                            prebuilt_voice_config=types.PrebuiltVoiceConfig(",
-        "                                voice_name=voice",
-        "                            )",
-        "                        )",
-        "                    )",
-        "                )",
-        "            )",
-        "            ",
-        "            audio_data = response.candidates[0].content.parts[0].inline_data.data",
-        "            ",
-        '            print(f"✅ Chunk {chunk_id}: Success on attempt {attempt + 1}")',
-        "            key_manager.mark_success()",
-        "            ",
-        "            return {",
-        "                'chunk_id': chunk_id,",
-        "                'audio_data': audio_data,",
-        "                'api_key': api_key,",
-        "                'attempts': attempt + 1,",
-        "                'success': True",
-        "            }",
-        "        ",
-        "        except Exception as e:",
-        "            error_msg = str(e)",
-        '            print(f"❌ Chunk {chunk_id}: Attempt {attempt + 1} failed: {error_msg}")',
-        "            ",
-        "            key_manager.mark_failure(api_key)",
-        "            ",
-        '            if "429" in error_msg or "quota" in error_msg.lower():',
-        '                print(f"⚠️ Rate limit hit on key {api_key[:20]}...")',
-        "                time.sleep(1)",
-        "            ",
-        "            if attempt == max_attempts - 1:",
-        "                return {",
-        "                    'chunk_id': chunk_id,",
-        "                    'audio_data': None,",
-        "                    'api_key': api_key,",
-        "                    'attempts': attempt + 1,",
-        "                    'success': False,",
-        "                    'error': error_msg",
-        "                }",
-        "    ",
-        "    return {",
-        "        'chunk_id': chunk_id,",
-        "        'audio_data': None,",
-        "        'api_key': None,",
-        "        'attempts': max_attempts,",
-        "        'success': False,",
-        "        'error': 'Max attempts reached'",
-        "    }",
-        "",
-        "def merge_audio_chunks(chunk_files, output_file):",
-        '    """',
-        "    Merge multiple audio chunks into a single file",
-        "    ",
-        "    Args:",
-        "        chunk_files: List of chunk file paths",
-        "        output_file: Output merged file path",
-        "    ",
-        "    Returns:",
-        "        True if successful, False otherwise",
-        '    """',
-        "    try:",
-        "        combined = AudioSegment.empty()",
-        "        ",
-        "        for chunk_file in chunk_files:",
-        "            if not os.path.exists(chunk_file):",
-        '                print(f"⚠️ Chunk file not found: {chunk_file}")',
-        "                continue",
-        "            ",
-        "            audio = AudioSegment.from_wav(chunk_file)",
-        "            combined += audio",
-        "        ",
-        '        combined.export(output_file, format="wav")',
-        '        print(f"✅ Merged {len(chunk_files)} chunks into {output_file}")',
-        "        return True",
-        "    ",
-        "    except Exception as e:",
-        '        print(f"❌ Error merging audio: {e}")',
-        "        return False",
-        "",
-        "def generate_voiceover(text, voice, model, progress=gr.Progress()):",
-        '    """',
-        "    Main voiceover generation function",
-        "    ",
-        "    Args:",
-        "        text: Input text",
-        "        voice: Voice name",
-        "        model: Model name",
-        "        progress: Gradio progress tracker",
-        "    ",
-        "    Returns:",
-        "        Tuple of (merged_audio, chunk_files_list, status_html)",
-        '    """',
-        "    try:",
-        "        # Validate input",
-        "        if not text or not text.strip():",
-        '            return None, [], "<span style=\\'color: red;\\'>❌ Please enter text</span>"',
-        "        ",
-        "        # Initialize",
-        "        key_manager.initialize()",
-        "        text = text.strip()",
-        "        text_length = len(text)",
-        "        word_count = len(text.split())",
-        "        ",
-        '        progress(0, desc="Initializing...")',
-        "        ",
-        "        # Single chunk",
-        "        if text_length <= 5000:",
-        '            progress(0.3, desc="Generating audio...")',
-        "            ",
-        "            result = generate_audio_chunk(text, voice, model, 0)",
-        "            ",
-        "            if not result['success']:",
-        '                error_html = f"<span style=\\'color: red;\\'>❌ Failed after {result[\\'attempts\\']} attempts<br>{result[\\'error\\']}</span>"',
-        "                return None, [], error_html",
-        "            ",
-        "            # Save audio file",
-        '            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")',
-        '            output_file = f"voiceover_{timestamp}.wav"',
-        "            ",
-        "            if not save_audio_file(output_file, result['audio_data']):",
-        '                return None, [], "<span style=\\'color: red;\\'>❌ Failed to save audio file</span>"',
-        "            ",
-        '            progress(1.0, desc="Complete!")',
-        "            ",
-        "            status_html = f\"\"\"",
-        "            <div style='padding: 10px; background: #e8f5e9; border-radius: 5px;'>",
-        "                <h3 style='color: #2e7d32; margin: 0 0 10px 0;'>✅ Generation Successful</h3>",
-        "                <p><b>Words:</b> {word_count} | <b>Characters:</b> {text_length}</p>",
-        "                <p><b>Attempts:</b> {result['attempts']}</p>",
-        "            </div>",
-        '            """',
-        "            ",
-        "            return output_file, [], status_html",
-        "        ",
-        "        # Multiple chunks",
-        "        else:",
-        '            progress(0.1, desc="Splitting text...")',
-        "            ",
-        "            chunks = split_text_at_sentences(text, max_chars=5000)",
-        "            num_chunks = len(chunks)",
-        "            ",
-        '            print(f"✂️ Split into {num_chunks} chunks")',
-        "            ",
-        '            progress(0.2, desc=f"Generating {num_chunks} chunks in parallel...")',
-        "            ",
-        "            # Generate all chunks in parallel",
-        "            results = []",
-        "            with ThreadPoolExecutor(max_workers=min(num_chunks, 10)) as executor:",
-        "                futures = {",
-        "                    executor.submit(generate_audio_chunk, chunk, voice, model, i): i ",
-        "                    for i, chunk in enumerate(chunks)",
-        "                }",
-        "                ",
-        "                completed = 0",
-        "                for future in as_completed(futures):",
-        "                    result = future.result()",
-        "                    results.append(result)",
-        "                    completed += 1",
-        '                    progress(0.2 + (0.6 * completed / num_chunks), desc=f"Generated {completed}/{num_chunks} chunks")',
-        "            ",
-        "            # Sort results by chunk_id",
-        "            results.sort(key=lambda x: x['chunk_id'])",
-        "            ",
-        "            # Check for failures",
-        "            failed = [r['chunk_id'] + 1 for r in results if not r['success']]",
-        "            if failed:",
-        '                error_html = f"<span style=\\'color: red;\\'>❌ Failed chunks: {failed}</span>"',
-        "                return None, [], error_html",
-        "            ",
-        '            progress(0.85, desc="Saving chunk files...")',
-        "            ",
-        "            # Save chunk files",
-        '            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")',
-        "            chunk_files = []",
-        "            ",
-        "            for result in results:",
-        '                chunk_filename = f"chunk_{result[\\'chunk_id\\'] + 1:02d}_{timestamp}.wav"',
-        "                ",
-        "                if save_audio_file(chunk_filename, result['audio_data']):",
-        "                    chunk_files.append(chunk_filename)",
-        "                else:",
-        '                    error_html = f"<span style=\\'color: red;\\'>❌ Failed to save chunk {result[\\'chunk_id\\'] + 1}</span>"',
-        "                    return None, [], error_html",
-        "            ",
-        '            progress(0.95, desc="Merging chunks...")',
-        "            ",
-        "            # Merge all chunks",
-        '            merged_filename = f"voiceover_merged_{timestamp}.wav"',
-        "            ",
-        "            if not merge_audio_chunks(chunk_files, merged_filename):",
-        '                error_html = "<span style=\\'color: red;\\'>❌ Failed to merge audio chunks</span>"',
-        "                return None, chunk_files, error_html",
-        "            ",
-        '            progress(1.0, desc="Complete!")',
-        "            ",
-        "            # Generate status HTML",
-        "            total_attempts = sum(r['attempts'] for r in results)",
-        "            stats = key_manager.get_stats()",
-        "            ",
-        '            chunk_list = "<br>".join([f"📁 Chunk {i+1}: {os.path.basename(f)}" for i, f in enumerate(chunk_files)])',
-        "            ",
-        "            status_html = f\"\"\"",
-        "            <div style='padding: 10px; background: #e8f5e9; border-radius: 5px;'>",
-        "                <h3 style='color: #2e7d32; margin: 0 0 10px 0;'>✅ Generation Successful</h3>",
-        "                <p><b>Chunks:</b> {num_chunks} (generated in parallel)</p>",
-        "                <p><b>Words:</b> {word_count} | <b>Characters:</b> {text_length}</p>",
-        "                <p><b>Total Attempts:</b> {total_attempts} | <b>Failed Keys:</b> {stats['failed_keys']}</p>",
-        "                <hr style='margin: 10px 0;'>",
-        "                <p><b>Individual Chunks:</b></p>",
-        "                {chunk_list}",
-        "            </div>",
-        '            """',
-        "            ",
-        "            return merged_filename, chunk_files, status_html",
-        "    ",
-        "    except Exception as e:",
-        '        print(f"❌ Critical error: {e}")',
-        '        error_html = f"<span style=\\'color: red;\\'>❌ Critical error: {str(e)}</span>"',
-        "        return None, [], error_html",
-        "",
-        "# Gradio Interface",
-        'with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Generator") as app:',
-        "    ",
-        '    gr.Markdown("# 🎙️ Gemini TTS Generator")',
-        "    ",
-        "    with gr.Row():",
-        "        with gr.Column(scale=1):",
-        "            text_input = gr.Textbox(",
-        '                label="Text",',
-        '                placeholder="Enter your text here (automatic chunking at 5000 characters)...",',
-        "                lines=12",
-        "            )",
-        "            ",
-        "            with gr.Row():",
-        "                voice_select = gr.Dropdown(",
-        "                    choices=list(VOICES.keys()),",
-        '                    value="Kore",',
-        '                    label="Voice"',
-        "                )",
-        "                ",
-        "                model_select = gr.Dropdown(",
-        "                    choices=list(MODELS.keys()),",
-        '                    value="Flash",',
-        '                    label="Model"',
-        "                )",
-        "            ",
-        '            generate_btn = gr.Button("🎵 Generate", variant="primary", size="lg")',
-        "        ",
-        "        with gr.Column(scale=1):",
-        '            merged_output = gr.Audio(label="🎵 Merged Audio", type="filepath")',
-        '            status_output = gr.HTML(label="Status")',
-        "    ",
-        "    # Chunk audio players (up to 20)",
-        "    with gr.Column(visible=True) as chunks_section:",
-        '        gr.Markdown("### 🎵 Individual Chunks")',
-        "        chunk_players = []",
-        "        for i in range(20):",
-        "            chunk_players.append(",
-        '                gr.Audio(label=f"Chunk {i+1}", type="filepath", visible=False)',
-        "            )",
-        "    ",
-        "    def process_generation(text, voice, model):",
-        '        """Process generation and return outputs for all components"""',
-        "        voice_name = VOICES[voice]",
-        "        model_name = MODELS[model]",
-        "        ",
-        "        merged, chunks, status = generate_voiceover(text, voice_name, model_name)",
-        "        ",
-        "        # Prepare chunk player outputs",
-        "        chunk_outputs = []",
-        "        for i in range(20):",
-        "            if chunks and i < len(chunks):",
-        "                chunk_outputs.append(gr.Audio(value=chunks[i], visible=True))",
-        "            else:",
-        "                chunk_outputs.append(gr.Audio(visible=False))",
-        "        ",
-        "        return [merged, status] + chunk_outputs",
-        "    ",
-        "    generate_btn.click(",
-        "        fn=process_generation,",
-        "        inputs=[text_input, voice_select, model_select],",
-        "        outputs=[merged_output, status_output] + chunk_players",
-        "    )",
-        "",
-        'print("🚀 Launching Gemini TTS Generator v2.0...")',
-        "app.launch(share=True, debug=True)"
-    ]
+    # Read the complete code as a multi-line string
+    complete_code = """# Install required libraries
+!pip install -q gradio google-generativeai pydub
+
+import gradio as gr
+import random
+import wave
+import os
+import re
+import time
+from datetime import datetime
+from google import genai
+from google.genai import types
+from pydub import AudioSegment
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
+# API Keys
+API_KEYS = [
+    'AIzaSyBWYWNkIt8Q7nl7I-JDj9ozaVwOAFf7WsA',
+    'AIzaSyB4Y_Z8bc82VN15pGes-a049ZNcjTsJTFs',
+    'AIzaSyD3vGJyJtdSKuaxbb4AZVosyJ76ult21d8',
+    'AIzaSyAbmN08A4l61-q1mYjK3DQe29BKcSYmov8',
+    'AIzaSyAD8-aEvVIvkBwQFUMugb9XgVDBUQR-zfk',
+    'AIzaSyD-nf3OHLbI5R23f7VLVLO1FHTWM6OWwCs',
+    'AIzaSyBjYlIv84CNzpudzYyl6ANCz-2xRtSw5Dc',
+    'AIzaSyCLjFGChLdvNSBoCVKbTAtR4zNTegeI19U',
+    'AIzaSyD5IB7uqfyAp9XbN7GrZb_ykofO44AFIWw',
+    'AIzaSyAuLu3EU3o_bp4GsHKKQuvE-u02EXEi308',
+    'AIzaSyDcwUdktdj5J1JsVn8pLY4aog2S-2hE1j4',
+    'AIzaSyCNJdzUaErIF4CkHhd_W3cNAhU7qqWgWLI',
+    'AIzaSyA94-jrtNUK1Rs9DWxE4YH7cAvpo4oGu5k',
+    'AIzaSyBiR58evdCtCGAtZiOvIiwAKtc6P-K6d0o',
+    'AIzaSyAC3au8LAdnk_-yrzKTZ9EfDUUypJc2K_0',
+    'AIzaSyANdNVOWRlRKubxa7w0lX21MFztQtHirbM',
+    'AIzaSyCqf1kobLM4Xo1WDkl49UJpXvJp3g1g6RE',
+    'AIzaSyAclybUHEwGic8nIRsIgV976UQNmxCAqSQ',
+    'AIzaSyCASH5DEm2l8JwfFWJw8gMtYgR8fjip2sA',
+    'AIzaSyBN0V0v5IetKuEFaKTB9vfyBE0oVzZDVWg'
+]
+
+# Voice and Model Options
+VOICES = {
+    "Zephyr": "Zephyr", "Puck": "Puck", "Charon": "Charon", "Kore": "Kore",
+    "Fenrir": "Fenrir", "Leda": "Leda", "Orus": "Orus", "Aoede": "Aoede",
+    "Callirhoe": "Callirhoe", "Autonoe": "Autonoe", "Enceladus": "Enceladus",
+    "Iapetus": "Iapetus", "Umbriel": "Umbriel", "Algieba": "Algieba",
+    "Despina": "Despina", "Erinome": "Erinome", "Algenib": "Algenib",
+    "Rasalgethi": "Rasalgethi", "Laomedeia": "Laomedeia", "Achernar": "Achernar",
+    "Alnilam": "Alnilam", "Schedar": "Schedar", "Gacrux": "Gacrux",
+    "Pulcherrima": "Pulcherrima", "Achird": "Achird", "Zubenelgenubi": "Zubenelgenubi",
+    "Vindemiatrix": "Vindemiatrix", "Sadachbia": "Sadachbia", "Sadaltager": "Sadaltager",
+    "Sulafat": "Sulafat"
+}
+
+MODELS = {
+    "Flash": "gemini-2.5-flash-preview-tts",
+    "Pro": "gemini-2.5-pro-preview-tts"
+}
+
+# API Key Manager
+class APIKeyManager:
+    \"\"\"Manages API key rotation with intelligent failure handling\"\"\"
     
-    # Create notebook
+    def __init__(self, keys):
+        self.all_keys = keys.copy()
+        self.current_pool = []
+        self.index = 0
+        self.consecutive_failures = 0
+        self.lock = threading.Lock()
+        self.failed_keys = set()
+    
+    def initialize(self):
+        \"\"\"Initialize with randomized key pool\"\"\"
+        with self.lock:
+            self.current_pool = self.all_keys.copy()
+            random.shuffle(self.current_pool)
+            self.index = 0
+            self.consecutive_failures = 0
+            self.failed_keys.clear()
+            print(f"🔑 Initialized with {len(self.current_pool)} API keys")
+    
+    def get_next_key(self):
+        \"\"\"Get next API key in sequential order\"\"\"
+        with self.lock:
+            if not self.current_pool:
+                return None
+            
+            key = self.current_pool[self.index % len(self.current_pool)]
+            self.index += 1
+            return key
+    
+    def mark_failure(self, key):
+        \"\"\"Mark key as failed and handle re-randomization\"\"\"
+        with self.lock:
+            self.failed_keys.add(key)
+            self.consecutive_failures += 1
+            
+            if self.consecutive_failures >= 3:
+                print("⚠️ 3 consecutive failures - Re-randomizing API pool...")
+                random.shuffle(self.current_pool)
+                self.index = 0
+                self.consecutive_failures = 0
+    
+    def mark_success(self):
+        \"\"\"Reset failure counter on success\"\"\"
+        with self.lock:
+            self.consecutive_failures = 0
+    
+    def get_stats(self):
+        \"\"\"Get current statistics\"\"\"
+        with self.lock:
+            return {
+                'total_keys': len(self.all_keys),
+                'failed_keys': len(self.failed_keys),
+                'consecutive_failures': self.consecutive_failures
+            }
+
+# Global key manager
+key_manager = APIKeyManager(API_KEYS)
+
+def split_text_at_sentences(text, max_chars=5000):
+    \"\"\"
+    Split text into chunks at sentence boundaries
+    
+    Args:
+        text: Input text to split
+        max_chars: Maximum characters per chunk
+    
+    Returns:
+        List of text chunks
+    \"\"\"
+    try:
+        # Split by sentence endings
+        sentences = re.split(r'(?<=[.!?])\\s+', text.strip())
+        
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            
+            # Check if adding sentence exceeds limit
+            test_chunk = f"{current_chunk} {sentence}".strip() if current_chunk else sentence
+            
+            if len(test_chunk) <= max_chars:
+                current_chunk = test_chunk
+            else:
+                # Save current chunk if it exists
+                if current_chunk:
+                    chunks.append(current_chunk)
+                
+                # Start new chunk with current sentence
+                current_chunk = sentence
+        
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks if chunks else [text]
+    
+    except Exception as e:
+        print(f"❌ Error splitting text: {e}")
+        return [text]
+
+def save_audio_file(filename, audio_bytes):
+    \"\"\"
+    Save audio bytes to WAV file
+    
+    Args:
+        filename: Output filename
+        audio_bytes: PCM audio data
+    
+    Returns:
+        True if successful, False otherwise
+    \"\"\"
+    try:
+        with wave.open(filename, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(audio_bytes)
+        return True
+    except Exception as e:
+        print(f"❌ Error saving audio file {filename}: {e}")
+        return False
+
+def generate_audio_chunk(chunk_text, voice, model, chunk_id, max_attempts=10):
+    \"\"\"
+    Generate audio for a single chunk with retry logic
+    
+    Args:
+        chunk_text: Text to convert to speech
+        voice: Voice name
+        model: Model name
+        chunk_id: Chunk identifier
+        max_attempts: Maximum retry attempts
+    
+    Returns:
+        Dict with audio_data, api_key, attempts, and success status
+    \"\"\"
+    for attempt in range(max_attempts):
+        api_key = key_manager.get_next_key()
+        
+        if not api_key:
+            print(f"❌ Chunk {chunk_id}: No API keys available")
+            return {
+                'chunk_id': chunk_id,
+                'audio_data': None,
+                'api_key': None,
+                'attempts': attempt + 1,
+                'success': False,
+                'error': 'No API keys available'
+            }
+        
+        # Skip known failed keys
+        if api_key in key_manager.failed_keys:
+            continue
+        
+        try:
+            print(f"🔄 Chunk {chunk_id}: Attempt {attempt + 1} with key {api_key[:20]}...")
+            
+            client = genai.Client(api_key=api_key)
+            
+            response = client.models.generate_content(
+                model=model,
+                contents=f"Say: {chunk_text}",
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=voice
+                            )
+                        )
+                    )
+                )
+            )
+            
+            audio_data = response.candidates[0].content.parts[0].inline_data.data
+            
+            print(f"✅ Chunk {chunk_id}: Success on attempt {attempt + 1}")
+            key_manager.mark_success()
+            
+            return {
+                'chunk_id': chunk_id,
+                'audio_data': audio_data,
+                'api_key': api_key,
+                'attempts': attempt + 1,
+                'success': True
+            }
+        
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Chunk {chunk_id}: Attempt {attempt + 1} failed: {error_msg}")
+            
+            key_manager.mark_failure(api_key)
+            
+            if "429" in error_msg or "quota" in error_msg.lower():
+                print(f"⚠️ Rate limit hit on key {api_key[:20]}...")
+                time.sleep(1)
+            
+            if attempt == max_attempts - 1:
+                return {
+                    'chunk_id': chunk_id,
+                    'audio_data': None,
+                    'api_key': api_key,
+                    'attempts': attempt + 1,
+                    'success': False,
+                    'error': error_msg
+                }
+    
+    return {
+        'chunk_id': chunk_id,
+        'audio_data': None,
+        'api_key': None,
+        'attempts': max_attempts,
+        'success': False,
+        'error': 'Max attempts reached'
+    }
+
+def merge_audio_chunks(chunk_files, output_file):
+    \"\"\"
+    Merge multiple audio chunks into a single file
+    
+    Args:
+        chunk_files: List of chunk file paths
+        output_file: Output merged file path
+    
+    Returns:
+        True if successful, False otherwise
+    \"\"\"
+    try:
+        combined = AudioSegment.empty()
+        
+        for chunk_file in chunk_files:
+            if not os.path.exists(chunk_file):
+                print(f"⚠️ Chunk file not found: {chunk_file}")
+                continue
+            
+            audio = AudioSegment.from_wav(chunk_file)
+            combined += audio
+        
+        combined.export(output_file, format="wav")
+        print(f"✅ Merged {len(chunk_files)} chunks into {output_file}")
+        return True
+    
+    except Exception as e:
+        print(f"❌ Error merging audio: {e}")
+        return False
+
+def generate_voiceover(text, voice, model, progress=gr.Progress()):
+    \"\"\"
+    Main voiceover generation function
+    
+    Args:
+        text: Input text
+        voice: Voice name
+        model: Model name
+        progress: Gradio progress tracker
+    
+    Returns:
+        Tuple of (merged_audio, chunk_files_list, status_html)
+    \"\"\"
+    try:
+        # Validate input
+        if not text or not text.strip():
+            return None, [], "<span style='color: red;'>❌ Please enter text</span>"
+        
+        # Initialize
+        key_manager.initialize()
+        text = text.strip()
+        text_length = len(text)
+        word_count = len(text.split())
+        
+        progress(0, desc="Initializing...")
+        
+        # Single chunk
+        if text_length <= 5000:
+            progress(0.3, desc="Generating audio...")
+            
+            result = generate_audio_chunk(text, voice, model, 0)
+            
+            if not result['success']:
+                error_html = f"<span style='color: red;'>❌ Failed after {result['attempts']} attempts<br>{result['error']}</span>"
+                return None, [], error_html
+            
+            # Save audio file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = f"voiceover_{timestamp}.wav"
+            
+            if not save_audio_file(output_file, result['audio_data']):
+                return None, [], "<span style='color: red;'>❌ Failed to save audio file</span>"
+            
+            progress(1.0, desc="Complete!")
+            
+            status_html = f\"\"\"
+            <div style='padding: 10px; background: #e8f5e9; border-radius: 5px;'>
+                <h3 style='color: #2e7d32; margin: 0 0 10px 0;'>✅ Generation Successful</h3>
+                <p><b>Words:</b> {word_count} | <b>Characters:</b> {text_length}</p>
+                <p><b>Attempts:</b> {result['attempts']}</p>
+            </div>
+            \"\"\"
+            
+            return output_file, [], status_html
+        
+        # Multiple chunks
+        else:
+            progress(0.1, desc="Splitting text...")
+            
+            chunks = split_text_at_sentences(text, max_chars=5000)
+            num_chunks = len(chunks)
+            
+            print(f"✂️ Split into {num_chunks} chunks")
+            
+            progress(0.2, desc=f"Generating {num_chunks} chunks in parallel...")
+            
+            # Generate all chunks in parallel
+            results = []
+            with ThreadPoolExecutor(max_workers=min(num_chunks, 10)) as executor:
+                futures = {
+                    executor.submit(generate_audio_chunk, chunk, voice, model, i): i 
+                    for i, chunk in enumerate(chunks)
+                }
+                
+                completed = 0
+                for future in as_completed(futures):
+                    result = future.result()
+                    results.append(result)
+                    completed += 1
+                    progress(0.2 + (0.6 * completed / num_chunks), desc=f"Generated {completed}/{num_chunks} chunks")
+            
+            # Sort results by chunk_id
+            results.sort(key=lambda x: x['chunk_id'])
+            
+            # Check for failures
+            failed = [r['chunk_id'] + 1 for r in results if not r['success']]
+            if failed:
+                error_html = f"<span style='color: red;'>❌ Failed chunks: {failed}</span>"
+                return None, [], error_html
+            
+            progress(0.85, desc="Saving chunk files...")
+            
+            # Save chunk files
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            chunk_files = []
+            
+            for result in results:
+                chunk_filename = f"chunk_{result['chunk_id'] + 1:02d}_{timestamp}.wav"
+                
+                if save_audio_file(chunk_filename, result['audio_data']):
+                    chunk_files.append(chunk_filename)
+                else:
+                    error_html = f"<span style='color: red;'>❌ Failed to save chunk {result['chunk_id'] + 1}</span>"
+                    return None, [], error_html
+            
+            progress(0.95, desc="Merging chunks...")
+            
+            # Merge all chunks
+            merged_filename = f"voiceover_merged_{timestamp}.wav"
+            
+            if not merge_audio_chunks(chunk_files, merged_filename):
+                error_html = "<span style='color: red;'>❌ Failed to merge audio chunks</span>"
+                return None, chunk_files, error_html
+            
+            progress(1.0, desc="Complete!")
+            
+            # Generate status HTML
+            total_attempts = sum(r['attempts'] for r in results)
+            stats = key_manager.get_stats()
+            
+            chunk_list = "<br>".join([f"📁 Chunk {i+1}: {os.path.basename(f)}" for i, f in enumerate(chunk_files)])
+            
+            status_html = f\"\"\"
+            <div style='padding: 10px; background: #e8f5e9; border-radius: 5px;'>
+                <h3 style='color: #2e7d32; margin: 0 0 10px 0;'>✅ Generation Successful</h3>
+                <p><b>Chunks:</b> {num_chunks} (generated in parallel)</p>
+                <p><b>Words:</b> {word_count} | <b>Characters:</b> {text_length}</p>
+                <p><b>Total Attempts:</b> {total_attempts} | <b>Failed Keys:</b> {stats['failed_keys']}</p>
+                <hr style='margin: 10px 0;'>
+                <p><b>Individual Chunks:</b></p>
+                {chunk_list}
+            </div>
+            \"\"\"
+            
+            return merged_filename, chunk_files, status_html
+    
+    except Exception as e:
+        print(f"❌ Critical error: {e}")
+        error_html = f"<span style='color: red;'>❌ Critical error: {str(e)}</span>"
+        return None, [], error_html
+
+# Gradio Interface
+with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Generator") as app:
+    
+    gr.Markdown("# 🎙️ Gemini TTS Generator")
+    
+    with gr.Row():
+        with gr.Column(scale=1):
+            text_input = gr.Textbox(
+                label="Text",
+                placeholder="Enter your text here (automatic chunking at 5000 characters)...",
+                lines=12
+            )
+            
+            with gr.Row():
+                voice_select = gr.Dropdown(
+                    choices=list(VOICES.keys()),
+                    value="Kore",
+                    label="Voice"
+                )
+                
+                model_select = gr.Dropdown(
+                    choices=list(MODELS.keys()),
+                    value="Flash",
+                    label="Model"
+                )
+            
+            generate_btn = gr.Button("🎵 Generate", variant="primary", size="lg")
+        
+        with gr.Column(scale=1):
+            merged_output = gr.Audio(label="🎵 Merged Audio", type="filepath")
+            status_output = gr.HTML(label="Status")
+    
+    # Chunk audio players (up to 20)
+    with gr.Column(visible=True) as chunks_section:
+        gr.Markdown("### 🎵 Individual Chunks")
+        chunk_players = []
+        for i in range(20):
+            chunk_players.append(
+                gr.Audio(label=f"Chunk {i+1}", type="filepath", visible=False)
+            )
+    
+    def process_generation(text, voice, model):
+        \"\"\"Process generation and return outputs for all components\"\"\"
+        voice_name = VOICES[voice]
+        model_name = MODELS[model]
+        
+        merged, chunks, status = generate_voiceover(text, voice_name, model_name)
+        
+        # Prepare chunk player outputs
+        chunk_outputs = []
+        for i in range(20):
+            if chunks and i < len(chunks):
+                chunk_outputs.append(gr.Audio(value=chunks[i], visible=True))
+            else:
+                chunk_outputs.append(gr.Audio(visible=False))
+        
+        return [merged, status] + chunk_outputs
+    
+    generate_btn.click(
+        fn=process_generation,
+        inputs=[text_input, voice_select, model_select],
+        outputs=[merged_output, status_output] + chunk_players
+    )
+
+print("🚀 Launching Gemini TTS Generator v2.0...")
+app.launch(share=True, debug=True)"""
+    
+    # Create notebook with code as a single cell
     notebook = {
         "cells": [
             {
@@ -563,7 +561,7 @@ def create_notebook():
                 "execution_count": None,
                 "metadata": {},
                 "outputs": [],
-                "source": complete_code_lines
+                "source": complete_code
             }
         ],
         "metadata": {
