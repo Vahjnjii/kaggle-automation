@@ -1,5 +1,39 @@
-# Complete Gemini TTS code - FULL VERSION
-    complete_code = """# Install required libraries
+import json
+import os
+from datetime import datetime
+
+# Set Kaggle credentials from environment variables BEFORE importing
+os.environ['KAGGLE_USERNAME'] = os.environ.get('KAGGLE_USERNAME', '')
+os.environ['KAGGLE_KEY'] = os.environ.get('KAGGLE_KEY', '')
+
+# NOW import Kaggle API (after credentials are set)
+from kaggle.api.kaggle_api_extended import KaggleApi
+
+def create_notebook():
+    api = KaggleApi()
+    api.authenticate()
+    
+    # Use FIXED notebook ID (will update same notebook every time)
+    username = os.environ.get('KAGGLE_USERNAME', 'your-username')
+    notebook_slug = "gemini-tts-voice-generator"
+    
+    # Notebook metadata
+    metadata = {
+        "id": f"{username}/{notebook_slug}",
+        "title": "Gemini TTS Voice Generator",
+        "code_file": "notebook.ipynb",
+        "language": "python",
+        "kernel_type": "notebook",
+        "is_private": True,
+        "enable_gpu": False,
+        "enable_internet": True,
+        "dataset_sources": [],
+        "competition_sources": [],
+        "kernel_sources": []
+    }
+    
+    # YOUR COMPLETE ORIGINAL CODE
+    complete_code = '''# Install required libraries
 !pip install -q gradio google-generativeai
 
 import gradio as gr
@@ -76,7 +110,7 @@ MODEL_OPTIONS = {
 }
 
 def save_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
-    \"\"\"Save PCM audio data to WAV file\"\"\"
+    """Save PCM audio data to WAV file"""
     with wave.open(filename, "wb") as wf:
         wf.setnchannels(channels)
         wf.setsampwidth(sample_width)
@@ -84,7 +118,7 @@ def save_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
         wf.writeframes(pcm)
 
 def generate_gemini_voiceover(text, voice_name, model_name, style_prompt=""):
-    \"\"\"
+    """
     Generate voiceover using Gemini's native TTS
     
     Args:
@@ -95,7 +129,7 @@ def generate_gemini_voiceover(text, voice_name, model_name, style_prompt=""):
     
     Returns:
         Path to the generated audio file and status message
-    \"\"\"
+    """
     try:
         # Validate input
         if not text or text.strip() == "":
@@ -163,11 +197,11 @@ def generate_gemini_voiceover(text, voice_name, model_name, style_prompt=""):
 # Create Gradio Interface
 with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Voice Generator") as demo:
     gr.Markdown(
-        \"\"\"
+        """
         # 🎙️ Gemini Native TTS - Hyper-Realistic Voice Generator
         ### Generate professional studio-quality voiceovers with Google's Gemini 2.5 AI
         **Features:** 30+ Ultra-Realistic Voices | Multi-Language | Style Control | Random API Key Rotation
-        \"\"\"
+        """
     )
     
     with gr.Row():
@@ -217,7 +251,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Voice Generator") as de
             )
     
     gr.Markdown(
-        \"\"\"
+        """
         ---
         ### 🌟 Available Voice Styles:
         - **Zephyr**: Bright and energetic
@@ -240,7 +274,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Voice Generator") as de
         - Each generation uses Gemini's native TTS (Preview)
         - Maximum quality with near-human voice synthesis
         - Rate limits apply - if you see errors, wait 30 seconds and retry
-        \"\"\"
+        """
     )
     
     # Event handler
@@ -289,4 +323,45 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Gemini TTS Voice Generator") as de
 
 # Launch the interface
 print("🚀 Launching Gemini Native TTS Interface...")
-demo.launch(share=True, debug=True)
+demo.launch(share=True, debug=True)'''
+    
+    # Create notebook
+    notebook = {
+        "cells": [
+            {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": complete_code.split('\n')
+            }
+        ],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "name": "python",
+                "version": "3.10.0"
+            }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 4
+    }
+    
+    # Save files
+    with open('notebook.ipynb', 'w') as f:
+        json.dump(notebook, f, indent=2)
+    
+    with open('kernel-metadata.json', 'w') as f:
+        json.dump(metadata, f, indent=2)
+    
+    # Push to Kaggle
+    print(f"📤 Updating notebook: {metadata['title']}")
+    api.kernels_push('.')
+    print(f"✅ Success! View at: https://www.kaggle.com/code/{metadata['id']}")
+
+if __name__ == "__main__":
+    create_notebook()
