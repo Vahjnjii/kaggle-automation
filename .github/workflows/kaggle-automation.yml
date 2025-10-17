@@ -1,8 +1,7 @@
 name: Create New Kaggle Notebook
 
 on:
-  repository_dispatch:
-    types: [run_notebook]
+  workflow_dispatch:
 
 jobs:
   deploy-to-kaggle:
