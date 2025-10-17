@@ -43,6 +43,7 @@ from google import genai
 from google.genai import types
 from pydub import AudioSegment
 import threading
+import shutil
 
 # Configuration
 KAGGLE_USERNAME = "shreevathsbbhh"
@@ -168,6 +169,41 @@ def generate_audio(text, voice, model):
     
     return None
 
+def upload_output_to_dataset(output_file, request_id):
+    try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+        
+        api = KaggleApi()
+        os.environ['KAGGLE_USERNAME'] = 'shreevathsbbhh'
+        os.environ['KAGGLE_KEY'] = '41ab4c2da2ce3c8d0f0e356b8007e01b'
+        api.authenticate()
+        
+        upload_dir = "/kaggle/working/output_upload"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        shutil.copy(output_file, upload_dir)
+        
+        metadata = {
+            "title": "Voiceover Outputs",
+            "id": f"{KAGGLE_USERNAME}/voiceover-outputs",
+            "licenses": [{"name": "CC0-1.0"}]
+        }
+        
+        with open(f"{upload_dir}/dataset-metadata.json", 'w') as f:
+            json.dump(metadata, f)
+        
+        try:
+            api.dataset_create_new(folder=upload_dir, convert_to_csv=False, dir_mode="zip")
+            print(f"✅ Created output dataset")
+        except:
+            api.dataset_create_version(folder=upload_dir, version_notes=f"Output: {request_id}", convert_to_csv=False, dir_mode="zip")
+            print(f"✅ Uploaded to output dataset")
+        
+        return True
+    except Exception as e:
+        print(f"❌ Upload error: {e}")
+        return False
+
 def check_for_requests():
     try:
         print("📥 Checking for requests...")
@@ -216,6 +252,11 @@ def process_request(request_data):
         return False
     
     print(f"✅ Saved: {output_filename}")
+    
+    if not upload_output_to_dataset(output_filename, request_id):
+        print(f"❌ Failed to upload")
+        return False
+    
     return True
 
 def main_loop(max_iterations=20, check_interval=10):
