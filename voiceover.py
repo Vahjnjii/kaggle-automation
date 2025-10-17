@@ -2,22 +2,18 @@ import json
 import os
 from datetime import datetime
 
-# Set Kaggle credentials from environment variables BEFORE importing
 os.environ['KAGGLE_USERNAME'] = os.environ.get('KAGGLE_USERNAME', '')
 os.environ['KAGGLE_KEY'] = os.environ.get('KAGGLE_KEY', '')
 
-# NOW import Kaggle API (after credentials are set)
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 def create_notebook():
     api = KaggleApi()
     api.authenticate()
     
-    # Use FIXED notebook ID (will update same notebook every time)
-    username = os.environ.get('KAGGLE_USERNAME', 'your-username')
+    username = os.environ.get('KAGGLE_USERNAME', 'shreevathsbbhh')
     notebook_slug = "gemini-tts-processor"
     
-    # Notebook metadata - IMPORTANT: Add request dataset as source
     metadata = {
         "id": f"{username}/{notebook_slug}",
         "title": "Gemini TTS Processor",
@@ -28,13 +24,12 @@ def create_notebook():
         "enable_gpu": False,
         "enable_internet": True,
         "dataset_sources": [
-            f"{username}/voiceover-requests"  # This allows the notebook to read requests
+            f"{username}/voiceover-requests"
         ],
         "competition_sources": [],
         "kernel_sources": []
     }
     
-    # Complete processor code as a multi-line string
     complete_code = """# Install required packages
 !pip install -q google-generativeai pydub
 
@@ -42,24 +37,17 @@ import json
 import os
 import time
 import wave
-import re
 import random
 from datetime import datetime
 from google import genai
 from google.genai import types
 from pydub import AudioSegment
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-# Kaggle API setup
-from kaggle.api.kaggle_api_extended import KaggleApi
-api = KaggleApi()
-api.authenticate()
-
-# Configuration - UPDATE THIS WITH YOUR USERNAME
-KAGGLE_USERNAME = "your-kaggle-username"  # ⚠️ CHANGE THIS
-REQUEST_DATASET = f"{KAGGLE_USERNAME}/voiceover-requests"
-OUTPUT_DATASET = f"{KAGGLE_USERNAME}/voiceover-outputs"
+# Configuration
+KAGGLE_USERNAME = "shreevathsbbhh"
+REQUEST_DATASET_PATH = "/kaggle/input/voiceover-requests"
+OUTPUT_WORKING_PATH = "/kaggle/working/outputs"
 
 # API Keys
 API_KEYS = [
@@ -85,23 +73,9 @@ API_KEYS = [
     'AIzaSyBN0V0v5IetKuEFaKTB9vfyBE0oVzZDVWg'
 ]
 
-# Voice mapping
-VOICE_MAP = {
-    "Kore": "Kore",
-    "Zephyr": "Zephyr",
-    "Puck": "Puck",
-    "Charon": "Charon",
-    "Fenrir": "Fenrir",
-    "Aoede": "Aoede"
-}
+VOICE_MAP = {"Kore": "Kore", "Zephyr": "Zephyr", "Puck": "Puck", "Charon": "Charon", "Fenrir": "Fenrir", "Aoede": "Aoede"}
+MODEL_MAP = {"Flash": "gemini-2.5-flash-preview-tts", "Pro": "gemini-2.5-pro-preview-tts"}
 
-# Model mapping
-MODEL_MAP = {
-    "Flash": "gemini-2.5-flash-preview-tts",
-    "Pro": "gemini-2.5-pro-preview-tts"
-}
-
-# API Key Manager
 class APIKeyManager:
     def __init__(self, keys):
         self.all_keys = keys.copy()
@@ -133,7 +107,7 @@ class APIKeyManager:
             self.failed_keys.add(key)
             self.consecutive_failures += 1
             if self.consecutive_failures >= 3:
-                print("⚠️ 3 consecutive failures - Re-randomizing API pool...")
+                print("⚠️ Re-randomizing API pool...")
                 random.shuffle(self.current_pool)
                 self.index = 0
                 self.consecutive_failures = 0
@@ -165,8 +139,7 @@ def generate_audio(text, voice, model):
             return None
         
         try:
-            print(f"🔄 Attempt {attempt + 1} with key {api_key[:20]}...")
-            
+            print(f"🔄 Attempt {attempt + 1}")
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(
                 model=MODEL_MAP.get(model, "gemini-2.5-flash-preview-tts"),
@@ -184,47 +157,38 @@ def generate_audio(text, voice, model):
             )
             
             audio_data = response.candidates[0].content.parts[0].inline_data.data
-            print(f"✅ Success on attempt {attempt + 1}")
+            print(f"✅ Success")
             key_manager.mark_success()
             return audio_data
             
         except Exception as e:
-            print(f"❌ Attempt {attempt + 1} failed: {e}")
+            print(f"❌ Failed: {e}")
             key_manager.mark_failure(api_key)
-            if "429" in str(e) or "quota" in str(e).lower():
-                time.sleep(1)
+            time.sleep(1)
     
     return None
 
 def check_for_requests():
     try:
-        print("📥 Checking for new requests...")
-        api.dataset_download_files(
-            REQUEST_DATASET,
-            path="requests_download",
-            unzip=True
-        )
-        
+        print("📥 Checking for requests...")
         requests_found = []
-        request_dir = "requests_download"
         
-        if os.path.exists(request_dir):
-            for filename in os.listdir(request_dir):
+        if os.path.exists(REQUEST_DATASET_PATH):
+            for filename in os.listdir(REQUEST_DATASET_PATH):
                 if filename.endswith('.json') and filename.startswith('request_'):
-                    filepath = os.path.join(request_dir, filename)
+                    filepath = os.path.join(REQUEST_DATASET_PATH, filename)
                     try:
                         with open(filepath, 'r') as f:
                             data = json.load(f)
                             if data.get('status') == 'pending':
                                 requests_found.append(data)
-                                print(f"📋 Found pending request: {data['id']}")
-                    except Exception as e:
-                        print(f"⚠️ Error reading {filename}: {e}")
+                                print(f"📋 Found: {data['id']}")
+                    except:
+                        pass
         
         return requests_found
-        
     except Exception as e:
-        print(f"⚠️ No requests found or error: {e}")
+        print(f"⚠️ Error: {e}")
         return []
 
 def process_request(request_data):
@@ -234,77 +198,35 @@ def process_request(request_data):
     model = request_data['model']
     
     print(f"\\n{'='*60}")
-    print(f"🎙️ Processing Request: {request_id}")
-    print(f"📝 Text: {text[:100]}{'...' if len(text) > 100 else ''}")
-    print(f"🎤 Voice: {voice}")
-    print(f"🤖 Model: {model}")
+    print(f"🎙️ Processing: {request_id}")
+    print(f"📝 Text: {text[:100]}")
     print(f"{'='*60}\\n")
     
     audio_data = generate_audio(text, voice, model)
     
     if not audio_data:
-        print(f"❌ Failed to generate audio for {request_id}")
+        print(f"❌ Failed to generate")
         return False
     
-    output_filename = f"{request_id}_output.wav"
+    os.makedirs(OUTPUT_WORKING_PATH, exist_ok=True)
+    output_filename = f"{OUTPUT_WORKING_PATH}/{request_id}_output.wav"
+    
     if not save_audio_file(output_filename, audio_data):
-        print(f"❌ Failed to save audio for {request_id}")
+        print(f"❌ Failed to save")
         return False
     
-    print(f"✅ Audio saved: {output_filename}")
-    return upload_output(output_filename)
-
-def upload_output(output_filename):
-    try:
-        os.makedirs("outputs_upload", exist_ok=True)
-        
-        import shutil
-        shutil.copy(output_filename, f"outputs_upload/{output_filename}")
-        
-        metadata = {
-            "title": "Voiceover Outputs",
-            "id": OUTPUT_DATASET,
-            "licenses": [{"name": "CC0-1.0"}]
-        }
-        
-        with open("outputs_upload/dataset-metadata.json", 'w') as f:
-            json.dump(metadata, f, indent=2)
-        
-        try:
-            api.dataset_create_new(
-                folder="outputs_upload",
-                convert_to_csv=False,
-                dir_mode="zip"
-            )
-            print(f"✅ Created output dataset with {output_filename}")
-        except:
-            api.dataset_create_version(
-                folder="outputs_upload",
-                version_notes=f"New output: {output_filename}",
-                convert_to_csv=False,
-                dir_mode="zip"
-            )
-            print(f"✅ Updated output dataset with {output_filename}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error uploading output: {e}")
-        return False
+    print(f"✅ Saved: {output_filename}")
+    return True
 
 def main_loop(max_iterations=20, check_interval=10):
-    print("🚀 Starting Voiceover Processing Notebook...")
-    print(f"📍 Request Dataset: {REQUEST_DATASET}")
-    print(f"📍 Output Dataset: {OUTPUT_DATASET}")
-    print(f"⚠️ Make sure to update KAGGLE_USERNAME in the code!")
-    print(f"\\n⏱️ Checking every {check_interval} seconds for {max_iterations} iterations\\n")
+    print("🚀 Starting Processing Notebook...")
+    print(f"📍 Request Path: {REQUEST_DATASET_PATH}")
+    print(f"📍 Output Path: {OUTPUT_WORKING_PATH}\\n")
     
     processed_requests = set()
     
     for iteration in range(max_iterations):
-        print(f"\\n{'='*60}")
-        print(f"🔄 Check Cycle {iteration + 1}/{max_iterations}")
-        print(f"{'='*60}")
+        print(f"\\n🔄 Check {iteration + 1}/{max_iterations}")
         
         pending_requests = check_for_requests()
         
@@ -312,33 +234,29 @@ def main_loop(max_iterations=20, check_interval=10):
             request_id = request_data['id']
             
             if request_id in processed_requests:
-                print(f"⏭️ Skipping already processed: {request_id}")
+                print(f"⏭️ Already processed: {request_id}")
                 continue
             
             success = process_request(request_data)
             
             if success:
                 processed_requests.add(request_id)
-                print(f"✅ Successfully processed: {request_id}")
+                print(f"✅ Done: {request_id}")
             else:
-                print(f"❌ Failed to process: {request_id}")
+                print(f"❌ Failed: {request_id}")
         
         if not pending_requests:
-            print("📭 No pending requests found")
+            print("📭 No pending requests")
         
         if iteration < max_iterations - 1:
-            print(f"\\n⏳ Waiting {check_interval} seconds before next check...")
+            print(f"⏳ Waiting {check_interval}s...")
             time.sleep(check_interval)
     
-    print(f"\\n{'='*60}")
-    print(f"✅ Processing complete! Processed {len(processed_requests)} requests")
-    print(f"{'='*60}")
+    print(f"\\n✅ Complete! Processed {len(processed_requests)} requests")
 
-# Start the processing loop
 main_loop(max_iterations=20, check_interval=10)
 """
     
-    # Create notebook with code as a single cell
     notebook = {
         "cells": [
             {
@@ -364,14 +282,12 @@ main_loop(max_iterations=20, check_interval=10)
         "nbformat_minor": 4
     }
     
-    # Save files
     with open('notebook.ipynb', 'w') as f:
         json.dump(notebook, f, indent=2)
     
     with open('kernel-metadata.json', 'w') as f:
         json.dump(metadata, f, indent=2)
     
-    # Push to Kaggle
     print(f"📤 Updating notebook: {metadata['title']}")
     api.kernels_push('.')
     print(f"✅ Success! View at: https://www.kaggle.com/code/{metadata['id']}")
