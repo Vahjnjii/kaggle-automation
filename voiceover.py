@@ -12,26 +12,24 @@ def create_notebook():
     api.authenticate()
     
     username = os.environ.get('KAGGLE_USERNAME', 'shreevathsbbhh')
-    notebook_slug = "gemini-tts-processor"
+    notebook_slug = "gemini-tts-processor-gdrive"
     
     metadata = {
         "id": f"{username}/{notebook_slug}",
-        "title": "Gemini TTS Processor",
+        "title": "Gemini TTS Processor (Google Drive)",
         "code_file": "notebook.ipynb",
         "language": "python",
         "kernel_type": "notebook",
         "is_private": True,
         "enable_gpu": False,
         "enable_internet": True,
-        "dataset_sources": [
-            f"{username}/voiceover-requests"
-        ],
+        "dataset_sources": [],
         "competition_sources": [],
         "kernel_sources": []
     }
     
     complete_code = """# Install required packages
-!pip install -q google-generativeai pydub
+!pip install -q google-generativeai pydub google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
 
 import json
 import os
@@ -43,14 +41,32 @@ from google import genai
 from google.genai import types
 from pydub import AudioSegment
 import threading
-import shutil
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+import io
 
 # Configuration
-KAGGLE_USERNAME = "shreevathsbbhh"
-REQUEST_DATASET_PATH = "/kaggle/input/voiceover-requests"
+REQUEST_FOLDER_ID = "1gm2LWQKiVNJxfghgvrtGdOeC3REX2GEm"
+OUTPUT_FOLDER_ID = "1Tu0CphcQl8ImQ5Lfl1peTzlGbezJ9pLt"
 OUTPUT_WORKING_PATH = "/kaggle/working/outputs"
 
-# API Keys
+# Service Account Credentials
+SERVICE_ACCOUNT_INFO = {
+    "type": "service_account",
+    "project_id": "keen-rhino-401606",
+    "private_key_id": "5983a6e48566f24b95047fcb1cf985c4be4c6b88",
+    "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDD/RDCXgoZJUU0\\nMaEIwOI3HbWMjbWLlOFo2q547fGGlYcLUdVpEufVOAXJz0Q+i9fnYJBecOANQ0G8\\nPB7OIIrrtgxfEXYuAOgaeCvDdhVCHRQVnV4SQ1KZ1a9RyZquoJfwcjM7dh9uauyh\\n/IHyhaV8v0SRmwcsrlBJaBrqjAVsz5ZO4H5C2zvglYtH3ACN9a4Xcj4sl+KmpadZ\\nt4uhF4GI67H1XkUcERJWCgGnxd7aezcSJltFtBbhZMmtzr3WGixxFro69iO76kqi\\nx/uxAv3/7VYFZY2YM7mc8Squtuyndvq1dwoQ5pkzC/fQNEYfZG9V0vOOe0wrpzks\\nMyYmfXuRAgMBAAECggEACXfKPXmJh1lzlGfpXaDjzMHUqWuXH50bnpMh5pmoF1ZV\\n5cgYRTEynexM60jmBReAYJ8bmlRdnoZnQI6u9kpAK87pnhYb3XERxWWUx6aGtGDv\\nPXQSvVMfRGs8Qvk4TcNYU7dQnkjAj/b+Y3ztUif+rJ4Y0+fnWtM48bLjyfzlrjHr\\nbfl8KUYSV0ZNN5VPWRNvxmlqhUHpRVsDKOpnmuOtLr85m4nxxM+9MFrSRv2jJib+\\nYjivTL/JOJGzSHs7MAIpns15dhm97C3uHA8Jlt1WNTzatQK4n9y4K9l3d4Yg7Zz5\\nJi5AqGbi2gF7sTtUtUCzioXWQv2NoUOy7LTduD5PGQKBgQDjd9sLPzdVoXs56kG8\\nBzLB2S2O+h4gv5tYJypPSnx2weez6/w6NCoSdL6MJsweN8HCt1A3K/N4wrXdG9+9\\nNFESJ72ukVdv5rHMd+aB0p/y0CUgMa9G6HltNYHyWUmlGeBgB9p3/dD/6/sXPsEU\\nONC7xzRRgZolPomUohSKdbE4MwKBgQDckmD4iDr5tJ65rud+Y+21mD/B5usURsEr\\nyXhU+f/JaLNtj3vP0U00l7ZNvH6scBhW/E5/hGYOzwsdjlWPAWnhcgMm3ZiOKK3g\\nfjwRFUvUzYh/a3MxSt5b4gvRkABoFE69WrLR5nysczAc/jQhMk8RlAGz7yNoCFa2\\nx+mxHAPJKwKBgB6D/cbMfEfomfdzDc6DyLNox0vfEhuimNyCpJJuk7P633KrvfKw\\n/NPtBYMX0VpccIoGvaQpKUiSFoPLMYDYe+fLnQ7GQMyqTj/39dyEvSB9+/0NrU39\\n8gxMmVpB0Ddt+UPoyc4/JsKujcjYil6EILyQRNyKXnuQoDRoagkJMPUxAoGBANDh\\nMkHKSQdV/AZd004G9gLFpoNK2g4+nwqHZZQbmBa1N04m1hpM3G9UyMi/G7rTAMnH\\nb9Mkn72gZqdbtjySGyHrZX611ZWygk8ZXGrVHxXsejoomFLy0rZyz7xqQWhO6u44\\n6SULv79T6hlaxiU1zlkYL7ClY4NOekfn86/Mlu03AoGAX3ChcsihroZNX2axLF2J\\n/pDK5oS6o3lFssW5YujCi43SoLyBssfF9fmtxqSpDboHBP8wSXCu/q9yvYZGWQLC\\nOSej4B5iGGCcvBrpyIJTwc693/j5brcsU139k7CH+QXa9GMMVsdTdVHA9I4FnJae\\n18fR6jmhVZLGumDdlDeszbM=\\n-----END PRIVATE KEY-----\\n",
+    "client_email": "tts-automation@keen-rhino-401606.iam.gserviceaccount.com",
+    "client_id": "101032843980915693986",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/tts-automation%40keen-rhino-401606.iam.gserviceaccount.com",
+    "universe_domain": "googleapis.com"
+}
+
+# API Keys for Gemini
 API_KEYS = [
     'AIzaSyBWYWNkIt8Q7nl7I-JDj9ozaVwOAFf7WsA',
     'AIzaSyB4Y_Z8bc82VN15pGes-a049ZNcjTsJTFs',
@@ -76,6 +92,14 @@ API_KEYS = [
 
 VOICE_MAP = {"Kore": "Kore", "Zephyr": "Zephyr", "Puck": "Puck", "Charon": "Charon", "Fenrir": "Fenrir", "Aoede": "Aoede"}
 MODEL_MAP = {"Flash": "gemini-2.5-flash-preview-tts", "Pro": "gemini-2.5-pro-preview-tts"}
+
+# Initialize Google Drive API
+def get_drive_service():
+    credentials = service_account.Credentials.from_service_account_info(
+        SERVICE_ACCOUNT_INFO,
+        scopes=['https://www.googleapis.com/auth/drive']
+    )
+    return build('drive', 'v3', credentials=credentials)
 
 class APIKeyManager:
     def __init__(self, keys):
@@ -169,58 +193,64 @@ def generate_audio(text, voice, model):
     
     return None
 
-def upload_output_to_dataset(output_file, request_id):
+def upload_output_to_drive(output_file, request_id):
     try:
-        from kaggle.api.kaggle_api_extended import KaggleApi
+        service = get_drive_service()
         
-        api = KaggleApi()
-        os.environ['KAGGLE_USERNAME'] = 'shreevathsbbhh'
-        os.environ['KAGGLE_KEY'] = '41ab4c2da2ce3c8d0f0e356b8007e01b'
-        api.authenticate()
-        
-        upload_dir = "/kaggle/working/output_upload"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        shutil.copy(output_file, upload_dir)
-        
-        metadata = {
-            "title": "Voiceover Outputs",
-            "id": f"{KAGGLE_USERNAME}/voiceover-outputs",
-            "licenses": [{"name": "CC0-1.0"}]
+        output_filename = f"{request_id}_output.wav"
+        file_metadata = {
+            'name': output_filename,
+            'parents': [OUTPUT_FOLDER_ID]
         }
         
-        with open(f"{upload_dir}/dataset-metadata.json", 'w') as f:
-            json.dump(metadata, f)
+        media = MediaFileUpload(output_file, mimetype='audio/wav')
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
         
-        try:
-            api.dataset_create_new(folder=upload_dir, convert_to_csv=False, dir_mode="zip")
-            print(f"✅ Created output dataset")
-        except:
-            api.dataset_create_version(folder=upload_dir, version_notes=f"Output: {request_id}", convert_to_csv=False, dir_mode="zip")
-            print(f"✅ Uploaded to output dataset")
-        
+        print(f"✅ Uploaded to Drive: {file.get('id')}")
         return True
     except Exception as e:
         print(f"❌ Upload error: {e}")
         return False
 
+def download_request_from_drive(file_id):
+    try:
+        service = get_drive_service()
+        request = service.files().get_media(fileId=file_id)
+        
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        
+        fh.seek(0)
+        return json.load(fh)
+    except Exception as e:
+        print(f"❌ Download error: {e}")
+        return None
+
 def check_for_requests():
     try:
-        print("📥 Checking for requests...")
-        requests_found = []
+        print("📥 Checking for requests in Google Drive...")
+        service = get_drive_service()
         
-        if os.path.exists(REQUEST_DATASET_PATH):
-            for filename in os.listdir(REQUEST_DATASET_PATH):
-                if filename.endswith('.json') and filename.startswith('request_'):
-                    filepath = os.path.join(REQUEST_DATASET_PATH, filename)
-                    try:
-                        with open(filepath, 'r') as f:
-                            data = json.load(f)
-                            if data.get('status') == 'pending':
-                                requests_found.append(data)
-                                print(f"📋 Found: {data['id']}")
-                    except:
-                        pass
+        # List all JSON files in request folder
+        query = f"'{REQUEST_FOLDER_ID}' in parents and mimeType='application/json' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+        
+        requests_found = []
+        for file in files:
+            if file['name'].startswith('request_') and file['name'].endswith('.json'):
+                request_data = download_request_from_drive(file['id'])
+                if request_data and request_data.get('status') == 'pending':
+                    request_data['file_id'] = file['id']  # Store for potential deletion
+                    requests_found.append(request_data)
+                    print(f"📋 Found: {request_data['id']}")
         
         return requests_found
     except Exception as e:
@@ -253,16 +283,16 @@ def process_request(request_data):
     
     print(f"✅ Saved: {output_filename}")
     
-    if not upload_output_to_dataset(output_filename, request_id):
+    if not upload_output_to_drive(output_filename, request_id):
         print(f"❌ Failed to upload")
         return False
     
     return True
 
 def main_loop(max_iterations=20, check_interval=10):
-    print("🚀 Starting Processing Notebook...")
-    print(f"📍 Request Path: {REQUEST_DATASET_PATH}")
-    print(f"📍 Output Path: {OUTPUT_WORKING_PATH}\\n")
+    print("🚀 Starting Processing Notebook (Google Drive)...")
+    print(f"📁 Request Folder: {REQUEST_FOLDER_ID}")
+    print(f"📁 Output Folder: {OUTPUT_FOLDER_ID}\\n")
     
     processed_requests = set()
     
@@ -275,7 +305,7 @@ def main_loop(max_iterations=20, check_interval=10):
             request_id = request_data['id']
             
             if request_id in processed_requests:
-                print(f"⏭️ Already processed: {request_id}")
+                print(f"⭐️ Already processed: {request_id}")
                 continue
             
             success = process_request(request_data)
@@ -287,7 +317,7 @@ def main_loop(max_iterations=20, check_interval=10):
                 print(f"❌ Failed: {request_id}")
         
         if not pending_requests:
-            print("📭 No pending requests")
+            print("🔭 No pending requests")
         
         if iteration < max_iterations - 1:
             print(f"⏳ Waiting {check_interval}s...")
